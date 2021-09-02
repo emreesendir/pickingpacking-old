@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - image: docker.pkg.github.com/emrelg/wms-backend/backend:dev
+        imagePullPolicy: Always
+        name: backend
+        env:
+          - name: TZ
+            value: Europe/Zurich
+        ports:
+        - containerPort: 8000
+          name: backend
+        volumeMounts:
+          - mountPath: "/home/app/config"
+            name: secret          
+          - mountPath: "/home/app/accessLog"
+            name: access-log-pv
+      imagePullSecrets:
+      - name: dockerconfigjson-github-com
+      volumes:
+        - name: secret
+          secret:
+            secretName: backend-secret
+        - name: access-log-pv
+          persistentVolumeClaim:
+            claimName: backend-access-log-pvc

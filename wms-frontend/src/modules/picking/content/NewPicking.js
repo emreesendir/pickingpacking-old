@@ -1,0 +1,194 @@
+import styled from 'styled-components'
+import { useState, useEffect } from 'react'
+import Loading from '../../../global/Loading'
+import Table from '../../../global/Table'
+import { get, post } from '../../../global/Services'
+
+//#region style
+const Outerdiv = styled.div`
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 95%;
+`;
+
+const Div = styled.div`
+    width: 90%;
+    height: 95%;
+    overflow: auto;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: top;
+    border-style: solid;
+
+    @media screen and (max-width: 700px){
+        font-size: 70%;
+    }
+`;
+
+const Select = styled.select`
+    width: 90%;
+    height: 2em;
+`;
+
+const BottomDiv = styled.div`
+    width: 100%;
+    height: 6%;
+    display: flex;
+    margin-top: auto;
+    border-top: solid 0.1em;
+`;
+
+const Button = styled.button`
+    width: 6em;
+    margin: 0.5em 0.5em 0.5em auto;
+
+    @media screen and (max-width: 700px){
+        font-size: 70%;
+    }
+`;
+
+//#endregion
+
+//#region column setup
+
+let changes = {};
+
+const COLUMNS = [
+    {
+        Header: 'Remote Id',
+        Footer: 'Remote Id',
+        accessor: 'remoteId'
+    },
+    {
+        Header: 'Order',
+        Footer: 'Order',
+        accessor: data => {
+            return (
+                <>
+                    {data.productLines.map(line => 
+                        <p style={{textAlign: 'left', marginLeft: '1em'}}>• {line.quantity} piece(s) {line.name}. Location: {line.location}</p>
+                    )}
+                </>
+            )
+        }
+    },
+    {
+        Header: 'Status',
+        Footer: 'Status',
+        accessor: 'status'
+    },
+    {
+        Header: 'Commands',
+        Footer: 'Commands',
+        accessor: data => {
+            return (
+                <>
+                    {data.commands.split('.').map(command => 
+                        <p>{command}</p>)}
+                </>
+            )
+        }
+    },
+    {
+        Header: 'Size',
+        Footer: 'Size',
+        accessor: data => {
+            return (
+                <>
+                    <Select id={data.id} name="cars" onChange={(e) => changes[e.target.id] = e.target.value} defaultValue=''>
+                        <option value=""></option>
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                    </Select>
+                </>
+            )
+        }
+    }
+]
+
+//#endregion
+
+const NewPicking = () => {
+    let pickcartnumberInput;
+    const [pickcartnumber, setPickcartnumber] = useState(false)
+    const clickPickcartnumber = (e) => {
+        e.preventDefault();
+        //api validate pickcart number
+    }
+
+
+    // Table
+    const [DATA, setDATA] = useState([])
+
+    const refreshTable = () => {
+        get('picking/listpicking/').then(data => {
+            changes = {};
+            setDATA([]);
+            setDATA(data)
+        })
+    }
+
+    useEffect(refreshTable, [])
+
+    // Post sizes
+    const [loading, setLoading] = useState([false, '', ''])
+
+    const submit = () => {
+        setLoading([true, 'Sending data to server...', 'spinner']);
+
+        const filtered = {};
+        for (const id in changes) {
+            if(changes[id] !== ''){
+                filtered[id] = changes[id]
+            }
+        }
+
+        post('management/sizing/', filtered).then(res => {
+            if(res) {
+                const err = res.filter(obj => obj.result !== 'OK');
+                if(err.length > 0) {
+                    setLoading([true, `Error occured for some orders: ${err => JSON.stringify(err)}`, 'error']);
+                    setTimeout(() => {
+                        setLoading([false, '', '']);
+                        refreshTable();
+                    }, 2000)
+                }else {
+                    setLoading([true, 'Successfull.', 'done']);
+                    setTimeout(() => {
+                        setLoading([false, '', '']);
+                        refreshTable(); 
+                    }, 1000)
+                }
+            }else{
+                setLoading([true, '! SERVER ERROR !', 'error']);
+                setTimeout(() => {
+                    setLoading([false, '', '']);
+                    refreshTable();
+                }, 1000)
+            }
+        })
+    }
+
+    return (
+        <>
+            {!pickcartnumber && <div>
+                <label style={{margin: '0.2em'}} htmlFor='pickcartnumber'>SCAN or Enter PickCart Number</label><br/>
+                <input style={{margin: '0.2em'}}  type='text' name='pickcartnumber' id='pickcartnumber' onChange={e => {pickcartnumberInput = e.target.value}}/><br/>
+                <button style={{margin: '0.2em'}}  onClick={clickPickcartnumber}>Continue...</button>
+            </div>}
+            {pickcartnumber && <Outerdiv>
+                {loading[0] && <Loading message={loading[1]} symbol={loading[2]}/>}
+                <Div>
+                    <Table data={DATA} columns={COLUMNS}/>
+                    <BottomDiv><Button onClick={submit}>Submit</Button></BottomDiv>
+                </Div>
+            </Outerdiv>}
+        </>
+    )
+}
+
+export default NewPicking
